@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.env
+venv/
+.venv/
+
+# Data (too large for GitHub — store on Drive or use Git LFS)
+data/
+*.ply
+*.bin
+*.pth
+*.zip
+
+# Training outputs (too large — keep on Drive)
+output/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (doc generator, not part of the research repo)
+node_modules/
+package-lock.json
+
+# Temp test files
+test_*.ply
+test_*.bin
+fake_*.json

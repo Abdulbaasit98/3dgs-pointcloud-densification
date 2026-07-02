@@ -1,0 +1,48 @@
+{
+  "scene": "Tanks & Temples truck",
+  "base_repo": "https://github.com/graphdeco-inria/gaussian-splatting",
+  "densification_params": {
+    "k": 6,
+    "factor": 3.0,
+    "max_new_per_point": 1
+  },
+  "initialization": {
+    "baseline_points": 136029,
+    "densified_points": 197869,
+    "increase_pct": 45.5
+  },
+  "final_gaussian_count": {
+    "baseline_iter7000": 1681300,
+    "densified_iter7000": 1733031,
+    "delta_pct": 3.1
+  },
+  "metrics": {
+    "baseline": {
+      "ours_1000": {"PSNR": 20.978, "SSIM": 0.7315, "LPIPS": 0.3542},
+      "ours_3000": {"PSNR": 22.728, "SSIM": 0.8074, "LPIPS": 0.2524},
+      "ours_7000": {"PSNR": 23.988, "SSIM": 0.8528, "LPIPS": 0.1950},
+      "ours_30000": {"PSNR": 25.481, "SSIM": 0.8850, "LPIPS": 0.1418}
+    },
+    "densified": {
+      "ours_1000": {"PSNR": 21.370, "SSIM": 0.7538, "LPIPS": 0.3264},
+      "ours_3000": {"PSNR": 22.966, "SSIM": 0.8183, "LPIPS": 0.2368},
+      "ours_7000": {"PSNR": 24.154, "SSIM": 0.8595, "LPIPS": 0.1846}
+    }
+  },
+  "per_view_analysis_iter7000": {
+    "n_test_views": 32,
+    "densified_better_count": 17,
+    "baseline_better_count": 15,
+    "mean_delta_l1": -0.0371,
+    "std_delta_l1": 0.3260,
+    "wilcoxon_p": 0.4883,
+    "paired_ttest_p": 0.5310,
+    "best_case_view": {"id": "00014", "baseline_l1": 9.96, "densified_l1": 9.14, "delta": -0.82},
+    "worst_case_view": {"id": "00003", "baseline_l1": 8.80, "densified_l1": 9.49, "delta": 0.68}
+  },
+  "compute": {
+    "gpu": "NVIDIA Tesla T4 (16GB, Google Colab free tier)",
+    "training_iterations": 7000,
+    "note": "Capped at 7000 due to Colab session limits. Baseline also completed a 30000-iteration run (see ours_30000 above)."
+  }
+}
