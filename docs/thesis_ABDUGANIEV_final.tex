@@ -1,0 +1,755 @@
+% ============================================================
+% Thesis: Neighbor-Interpolated Point Cloud Densification
+%         for 3D Gaussian Splatting Initialization
+% Author: ABDUGANIEV ABDULVOSIT
+% Seoul National University of Science and Technology
+% MSc Integrated IT Engineering, 2026
+% ============================================================
+
+\documentclass[12pt, a4paper]{article}
+
+% --- Packages ---
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{abstract}
+\usepackage{natbib}
+\usepackage{url}
+
+\usepackage{parskip}
+\usepackage{tcolorbox}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% --- Colors ---
+\definecolor{seoulblue}{RGB}{0, 71, 171}
+\definecolor{codebg}{RGB}{245, 245, 245}
+\definecolor{notecolor}{RGB}{255, 244, 206}
+\definecolor{resultgreen}{RGB}{29, 158, 117}
+
+% --- Hyperref setup ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=seoulblue,
+    citecolor=seoulblue,
+    urlcolor=seoulblue,
+    pdftitle={Neighbor-Interpolated Point Cloud Densification for 3D Gaussian Splatting},
+    pdfauthor={Abduganiev Abdulvosit}
+}
+
+% --- Header/Footer ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{Abduganiev Abdulvosit}}
+\fancyhead[R]{\small\textit{MSc Thesis Draft, SeoulTech 2026}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% --- Section formatting ---
+\titleformat{\section}{\large\bfseries\color{seoulblue}}{{\thesection}}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{{\thesubsection}}{1em}{}
+
+% --- Code listing style ---
+\lstset{
+    backgroundcolor=\color{codebg},
+    basicstyle=\ttfamily\footnotesize,
+    breaklines=true,
+    frame=single,
+    rulecolor=\color{gray!40},
+    keywordstyle=\color{seoulblue}\bfseries,
+    commentstyle=\color{gray},
+    stringstyle=\color{resultgreen},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    numbersep=6pt,
+    xleftmargin=12pt,
+    language=Python
+}
+
+% --- Theorem environments ---
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+
+% --- Note box ---
+\tcbset{
+    notebox/.style={
+        colback=notecolor,
+        colframe=orange!60,
+        fonttitle=\bfseries,
+        title=Note,
+        left=4pt, right=4pt, top=4pt, bottom=4pt
+    }
+}
+
+% ============================================================
+\begin{document}
+\onehalfspacing
+
+% ---- TITLE PAGE ----
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\Large\bfseries\color{seoulblue}
+Neighbor-Interpolated Point Cloud Densification\\[0.5em]
+for 3D Gaussian Splatting Initialization}
+
+\vspace{1.5cm}
+{\large Thesis Research Draft}
+
+\vspace{2cm}
+{\Large\bfseries ABDUGANIEV ABDULVOSIT}\\[0.5em]
+{\normalsize Student ID: 24512169}
+
+\vspace{1cm}
+{\normalsize
+Seoul National University of Science and Technology (SeoulTech)\\
+Department of Integrated IT Engineering\\Smart Media and Network Lab
+Master of Science\\
+2026}
+
+\vspace{1.5cm}
+{\normalsize Supervisor: Prof. Dong Ho Kim}
+
+\vspace{2cm}
+{\normalsize
+\textbf{GitHub:}
+\url{https://github.com/Abdulbaasit98/3dgs-pointcloud-densification}}
+
+\vfill
+{\small Draft -- \today}
+\end{titlepage}
+
+% ---- TABLE OF CONTENTS ----
+\tableofcontents
+\newpage
+
+% ============================================================
+\section*{Abstract}
+\addcontentsline{toc}{section}{Abstract}
+
+3D Gaussian Splatting (3DGS) has emerged as a leading technique for real-time novel
+view synthesis, achieving state-of-the-art quality through a differentiable Gaussian
+rasterizer jointly optimized with a set of 3D Gaussians initialized from a sparse
+Structure-from-Motion (SfM) point cloud. A known limitation of this pipeline is
+sensitivity to the quality and coverage of the initial point cloud: regions
+under-sampled by SfM---such as textureless or reflective surfaces---begin training
+with insufficient Gaussian density and depend entirely on Adaptive Density Control
+(ADC) to compensate, which can slow early convergence.
+
+This thesis proposes and evaluates a lightweight preprocessing step---\textit{neighbor-interpolated point cloud densification}---that inserts new points at the
+midpoints of geometrically sparse neighbor pairs in the SfM point cloud before
+Gaussian initialization. The method requires zero modifications to the 3DGS training
+code, runs on CPU in seconds, and increases the initial point count by a controlled
+margin.
+
+Experiments on the Tanks and Temples \textit{truck} scene demonstrate consistent
+improvement in PSNR, SSIM, and LPIPS at every evaluated training checkpoint
+($\Delta\text{PSNR} = +0.39\,\text{dB}$ at iteration 1{,}000;
+$+0.17\,\text{dB}$ at 7{,}000), with the improvement most pronounced in early
+training and diminishing as ADC compensates. Per-view statistical analysis
+(Wilcoxon signed-rank, $p = 0.49$) indicates the effect, while consistent in
+aggregate metrics, does not reach significance at the per-view level with $n = 32$
+views and a single scene. Final Gaussian counts were comparable between conditions
+(baseline: 1{,}681{,}300; densified: 1{,}733{,}031), indicating no compactness
+benefit. All code, data, and results are publicly available.
+
+\textbf{Keywords:} 3D Gaussian Splatting, Novel View Synthesis, Point Cloud
+Initialization, Structure-from-Motion, Adaptive Density Control.
+
+\newpage
+
+% ============================================================
+\section{Introduction}
+
+Novel view synthesis---the problem of rendering a scene from arbitrary camera
+positions given only a set of training images---has undergone a dramatic
+transformation in recent years. Neural Radiance Fields (NeRF), introduced by
+\citet{mildenhall2020nerf}, demonstrated that a continuous volumetric scene
+representation could be learned end-to-end from posed images using differentiable
+volume rendering, achieving unprecedented photorealism. Despite this success,
+NeRF's reliance on ray marching through a neural network makes real-time rendering
+computationally prohibitive.
+
+3D Gaussian Splatting (3DGS), proposed by \citet{kerbl20233dgs}, addresses this
+limitation by representing scenes as a collection of anisotropic 3D Gaussians
+rendered through a differentiable tile-based rasterizer. By coupling an explicit
+point-cloud representation with a fast GPU rasterizer, 3DGS achieves real-time
+rendering speeds ($>$100 FPS) while matching or exceeding NeRF-level quality on
+standard benchmarks.
+
+A core aspect of the 3DGS pipeline that has received comparatively little attention
+is the \textit{initialization} of the Gaussian set. The method initializes one
+Gaussian at the location of each point in a sparse 3D point cloud produced by
+Structure-from-Motion (SfM), typically COLMAP \citep{schonberger2016sfm}. Regions
+that are geometrically challenging for SfM---including textureless surfaces,
+specular materials, and weakly-observed scene boundaries---produce few or no
+reconstructed points, resulting in gaps in the initial Gaussian set.
+
+This thesis investigates a simple, targeted approach: gap-filling point cloud
+densification via $k$-nearest-neighbor midpoint interpolation. Before the SfM
+point cloud is passed to the Gaussian initializer, a lightweight preprocessing pass
+identifies sparse neighbor pairs and inserts new points at their midpoints with
+interpolated color. This step is purely geometric, runs entirely on CPU in seconds,
+requires no neural components, and leaves the 3DGS training pipeline completely
+unmodified.
+
+\subsection{Contributions}
+
+\begin{itemize}
+    \item A gap-filling point cloud densification algorithm based on $k$-NN
+    midpoint interpolation, implemented as a CPU-only preprocessing script
+    compatible with the official 3DGS pipeline.
+
+    \item A controlled experimental evaluation on the Tanks and Temples
+    \textit{truck} scene comparing standard vs.\ densified initialization
+    across multiple training checkpoints, using PSNR, SSIM, and LPIPS.
+
+    \item A per-view robustness analysis including Wilcoxon signed-rank and
+    paired $t$-test statistical testing, and a compactness analysis of
+    final Gaussian counts under both conditions.
+
+    \item A fully reproducible implementation with public code, notebook,
+    and results at \url{https://github.com/Abdulbaasit98/3dgs-pointcloud-densification}.
+\end{itemize}
+
+% ============================================================
+\section{Related Work}
+
+\subsection{Neural Radiance Fields}
+
+\citet{mildenhall2020nerf} introduced NeRF, which encodes a scene as a continuous
+volumetric function $F_\theta: (\mathbf{x}, \mathbf{d}) \to (\mathbf{c}, \sigma)$
+mapping a 3D position $\mathbf{x} \in \mathbb{R}^3$ and viewing direction
+$\mathbf{d} \in \mathbb{S}^2$ to color and density, optimized via differentiable
+volume rendering. Subsequent work improved training speed through hash-grid
+encodings \citep{muller2022instant} and extended NeRF to unbounded scenes
+\citep{barron2022mipnerf360} and dynamic scenes \citep{pumarola2021dnerf}.
+
+\subsection{3D Gaussian Splatting}
+
+\citet{kerbl20233dgs} proposed 3DGS, representing scenes as a set of anisotropic
+3D Gaussians. Each Gaussian $\mathcal{G}_i$ is parameterized by:
+\begin{equation}
+    \mathcal{G}_i = \{\boldsymbol{\mu}_i,\, \boldsymbol{\Sigma}_i,\, \alpha_i,\, \mathbf{c}_i\}
+\end{equation}
+where $\boldsymbol{\mu}_i \in \mathbb{R}^3$ is the center position,
+$\boldsymbol{\Sigma}_i \in \mathbb{R}^{3\times3}$ is the covariance matrix
+(decomposed as $\boldsymbol{\Sigma} = \mathbf{R}\mathbf{S}\mathbf{S}^\top\mathbf{R}^\top$
+with rotation $\mathbf{R}$ and scaling $\mathbf{S}$), $\alpha_i \in [0,1]$ is
+opacity, and $\mathbf{c}_i$ are spherical harmonic color coefficients.
+
+The influence of a Gaussian at a 3D point $\mathbf{x}$ is:
+\begin{equation}
+    G_i(\mathbf{x}) = \exp\!\left(-\tfrac{1}{2}(\mathbf{x}-\boldsymbol{\mu}_i)^\top \boldsymbol{\Sigma}_i^{-1} (\mathbf{x}-\boldsymbol{\mu}_i)\right)
+\end{equation}
+
+Rendering proceeds via $\alpha$-compositing of Gaussians sorted by depth:
+\begin{equation}
+    \mathbf{C} = \sum_{i=1}^{N} \mathbf{c}_i \alpha_i \prod_{j=1}^{i-1}(1 - \alpha_j)
+\end{equation}
+
+Optimization uses a combined photometric and SSIM loss:
+\begin{equation}
+    \mathcal{L} = (1 - \lambda)\mathcal{L}_1 + \lambda\,\mathcal{L}_\text{SSIM}
+    \label{eq:loss}
+\end{equation}
+where $\lambda = 0.2$ in the original paper.
+
+\subsection{Initialization Sensitivity in 3DGS}
+
+\citet{foroutan2024sfm} systematically evaluated alternatives to SfM initialization
+for Gaussian Splatting, finding that initialization quality significantly affects
+convergence and final reconstruction quality. \citet{jung2024rain} proposed RAIN-GS,
+which relaxes the accurate initialization constraint, allowing training to recover
+from low-quality point clouds through aggressive optimization. The present work
+takes the complementary direction: improving the initialization itself via fast
+geometric preprocessing, leaving the optimizer unchanged.
+
+\subsection{Point Cloud Densification}
+
+Classical point cloud upsampling methods include Moving Least Squares (MLS)
+surface fitting and deep learning approaches such as PU-Net. These target
+production of geometrically accurate dense surfaces. Our approach is simpler
+and more targeted: reducing large gaps in the SfM cloud to improve Gaussian
+coverage, using only pairwise distance geometry and linear color interpolation---
+no surface model is required.
+
+\subsection{Compact Gaussian Representations}
+
+LightGaussian \citep{fan2024lightgaussian} and Compact3D \citep{navaneet2023compact3d}
+propose pruning and quantization strategies to reduce the final Gaussian count.
+Scaffold-GS \citep{lu2024scaffold} introduces anchor-based Gaussians to reduce
+redundancy. These methods operate on the trained model, complementary to the
+present work. The compactness analysis in Section~\ref{sec:compactness} directly
+examines whether initialization density affects the final Gaussian count.
+
+% ============================================================
+\section{Method}
+
+\subsection{Problem Formulation}
+
+Let $\mathcal{P} = \{(\mathbf{p}_i, \mathbf{c}_i)\}_{i=1}^{N}$ denote the sparse
+SfM point cloud, where $\mathbf{p}_i \in \mathbb{R}^3$ is the 3D position and
+$\mathbf{c}_i \in [0,255]^3$ is the RGB color of the $i$-th point. The 3DGS
+pipeline initializes one Gaussian at each $\mathbf{p}_i$. We seek to construct a
+denser point cloud
+$\mathcal{P}' = \mathcal{P} \cup \mathcal{P}_\text{new}$
+such that the geometric coverage of the scene is improved, without access to
+additional images or depth sensors.
+
+\subsection{Gap Detection via $k$-Nearest Neighbors}
+
+For each point $\mathbf{p}_i \in \mathcal{P}$, we compute its $k$ nearest
+neighbors using a $k$-d tree. Let $d_{ij} = \|\mathbf{p}_i - \mathbf{p}_j\|_2$
+denote the Euclidean distance from point $i$ to its $j$-th nearest neighbor.
+
+We define the \textit{scene-scale reference distance} as the median nearest-neighbor
+distance:
+\begin{equation}
+    d_\text{med} = \mathrm{median}_{i}\, d_{i,1}
+    \label{eq:dmed}
+\end{equation}
+
+A neighbor pair $(\mathbf{p}_i, \mathbf{p}_j)$ is classified as a \textit{gap} if:
+\begin{equation}
+    d_{ij} > \tau \cdot d_\text{med}
+    \label{eq:gap}
+\end{equation}
+where $\tau > 1$ is the gap-threshold factor (hyperparameter). A higher $\tau$
+results in fewer, more conservative insertions; a lower $\tau$ fills more aggressively.
+
+\subsection{Midpoint Interpolation}
+
+For each detected gap pair $(\mathbf{p}_i, \mathbf{p}_j)$, a new point is inserted
+at their geometric midpoint with linearly interpolated color:
+\begin{align}
+    \mathbf{p}_\text{new} &= \frac{\mathbf{p}_i + \mathbf{p}_j}{2}
+    \label{eq:midpoint} \\
+    \mathbf{c}_\text{new} &= \left\lfloor\frac{\mathbf{c}_i + \mathbf{c}_j}{2}\right\rfloor
+    \label{eq:colorinterp}
+\end{align}
+
+To prevent excessive growth in sparse outlier regions, the number of new points
+inserted per original point is capped at $m_\text{max}$ (hyperparameter). Each
+pair $(i, j)$ is processed at most once (using a seen-pairs set).
+
+\subsection{Algorithm}
+
+\begin{algorithm}[H]
+\caption{Neighbor-Interpolated Point Cloud Densification}
+\label{alg:densify}
+\begin{algorithmic}[1]
+\Require Point cloud $\mathcal{P} = \{(\mathbf{p}_i, \mathbf{c}_i)\}$,
+         neighbors $k$, threshold factor $\tau$, max new per point $m_\text{max}$
+\Ensure Densified point cloud $\mathcal{P}'$
+\State Build $k$-d tree $T$ over $\{\mathbf{p}_i\}$
+\State Compute $d_\text{med}$ via Eq.~\eqref{eq:dmed}
+\State $\mathcal{P}_\text{new} \leftarrow \emptyset$; $\text{seen} \leftarrow \emptyset$
+\For{each point $i$}
+    \State $\text{inserted} \leftarrow 0$
+    \For{each neighbor $j$ of $i$ in $T$ (in distance order)}
+        \If{$\text{inserted} \geq m_\text{max}$} \textbf{break} \EndIf
+        \If{$d_{ij} \leq \tau \cdot d_\text{med}$} \textbf{continue} \EndIf
+        \If{$(i,j) \in \text{seen}$} \textbf{continue} \EndIf
+        \State $\text{seen} \leftarrow \text{seen} \cup \{(\min(i,j),\max(i,j))\}$
+        \State Compute $\mathbf{p}_\text{new}$, $\mathbf{c}_\text{new}$ via Eqs.~\eqref{eq:midpoint}--\eqref{eq:colorinterp}
+        \State $\mathcal{P}_\text{new} \leftarrow \mathcal{P}_\text{new} \cup \{(\mathbf{p}_\text{new}, \mathbf{c}_\text{new})\}$
+        \State $\text{inserted} \leftarrow \text{inserted} + 1$
+    \EndFor
+\EndFor
+\State \Return $\mathcal{P}' = \mathcal{P} \cup \mathcal{P}_\text{new}$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Hyperparameters}
+
+Table~\ref{tab:hyperparams} summarizes the hyperparameters used in this study.
+
+\begin{table}[h]
+\centering
+\caption{Hyperparameter settings used in the experiment.}
+\label{tab:hyperparams}
+\begin{tabular}{llp{7cm}}
+\toprule
+\textbf{Parameter} & \textbf{Value} & \textbf{Effect} \\
+\midrule
+$k$ & 6 & Number of nearest neighbors considered per point \\
+$\tau$ & 3.0 & Gap threshold multiplier; higher = fewer insertions \\
+$m_\text{max}$ & 1 & Max new points per original point; limits growth \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Integration with 3DGS}
+
+The method requires \textbf{zero changes} to the 3DGS training code. The
+\texttt{dataset\_readers.py} loader in the official repository reads whichever
+\texttt{points3D.ply} file it finds in the scene's \texttt{sparse/0/} folder.
+Integration is therefore a file replacement:
+
+\begin{enumerate}
+    \item Copy the original scene folder (preserving cameras and images unchanged).
+    \item Run Algorithm~\ref{alg:densify} on the original \texttt{points3D.bin},
+          writing the output as \texttt{points3D.ply}.
+    \item Train using the standard \texttt{train.py} command, pointing to the
+          modified scene folder.
+\end{enumerate}
+
+% ============================================================
+\section{Experiments}
+
+\subsection{Scene and Dataset}
+
+We evaluate on the \textit{truck} scene from the Tanks and Temples benchmark
+\citep{knapitsch2017tanks}: 251 training images, 32 held-out test views,
+approximately 136{,}029 points in the original SfM reconstruction.
+
+\subsection{Training Configuration}
+
+\begin{table}[h]
+\centering
+\caption{Training configuration for both conditions.}
+\label{tab:config}
+\begin{tabular}{ll}
+\toprule
+\textbf{Setting} & \textbf{Value} \\
+\midrule
+GPU & NVIDIA Tesla T4 (16\,GB, Google Colab free tier) \\
+Iterations & 7{,}000 (paper uses 30{,}000; compute-constrained) \\
+Test iterations & 1{,}000 / 3{,}000 / 7{,}000 \\
+Loss & $(1-\lambda)\mathcal{L}_1 + \lambda\mathcal{L}_\text{SSIM}$, $\lambda=0.2$ \\
+Random seed & Fixed (identical for both conditions) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Evaluation Metrics}
+
+We report three standard metrics on held-out test views:
+
+\begin{itemize}
+    \item \textbf{PSNR} (Peak Signal-to-Noise Ratio, dB): higher is better.
+    \begin{equation}
+        \text{PSNR} = 10\log_{10}\!\left(\frac{\text{MAX}^2}{\text{MSE}}\right)
+    \end{equation}
+    \item \textbf{SSIM} (Structural Similarity Index): higher is better, $\in [0,1]$.
+    \item \textbf{LPIPS} (Learned Perceptual Image Patch Similarity,
+    VGG backbone): lower is better.
+\end{itemize}
+
+% ============================================================
+\section{Results}
+
+\subsection{Point Cloud Statistics}
+
+After applying Algorithm~\ref{alg:densify} with $k=6$, $\tau=3.0$, $m_\text{max}=1$:
+
+\begin{equation}
+    d_\text{med} = 0.01129, \qquad \tau \cdot d_\text{med} = 0.03387
+\end{equation}
+
+\begin{table}[h]
+\centering
+\caption{Point cloud statistics before and after densification.}
+\label{tab:pointcloud}
+\begin{tabular}{lrr}
+\toprule
+\textbf{Condition} & \textbf{Initial points} & \textbf{Increase} \\
+\midrule
+Baseline (original SfM) & 136{,}029 & --- \\
+Densified               & 197{,}869 & $+61{,}840$ ($+45.5\%$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Convergence Speed}
+\label{sec:convergence}
+
+Table~\ref{tab:results} reports PSNR, SSIM, and LPIPS on 32 held-out test views at
+matched training checkpoints. $\Delta$ values are densified minus baseline; positive
+$\Delta$PSNR/$\Delta$SSIM and negative $\Delta$LPIPS indicate improvement.
+
+\begin{table}[h]
+\centering
+\caption{Quantitative results: baseline vs.\ densified initialization.
+Arrows indicate the direction of improvement.
+$\Delta$ = densified $-$ baseline.}
+\label{tab:results}
+\begin{tabular}{c
+    r
+    r
+    r
+    r
+    r
+    r
+    r
+    r
+    r}
+\toprule
+& \multicolumn{3}{c}{\textbf{PSNR} (dB) $\uparrow$}
+& \multicolumn{3}{c}{\textbf{SSIM} $\uparrow$}
+& \multicolumn{3}{c}{\textbf{LPIPS} $\downarrow$} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+\textbf{Iter} & {Base} & {Dense} & {$\Delta$}
+              & {Base} & {Dense} & {$\Delta$}
+              & {Base} & {Dense} & {$\Delta$} \\
+\midrule
+1{,}000 & 20.978 & 21.370 & \bfseries +0.391
+        & 0.7315 & 0.7538 & \bfseries +0.0223
+        & 0.3542 & 0.3264 & \bfseries -0.0278 \\
+3{,}000 & 22.728 & 22.966 & \bfseries +0.238
+        & 0.8074 & 0.8183 & \bfseries +0.0108
+        & 0.2524 & 0.2368 & \bfseries -0.0156 \\
+7{,}000 & 23.988 & 24.154 & \bfseries +0.165
+        & 0.8528 & 0.8595 & \bfseries +0.0067
+        & 0.1950 & 0.1846 & \bfseries -0.0103 \\
+\midrule
+\multicolumn{10}{l}{\textit{Reference (baseline only, full 30k run):}} \\
+30{,}000 & 25.481 & {---} & {---}
+         & 0.8850 & {---} & {---}
+         & 0.1418 & {---} & {---} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Densified initialization outperforms the baseline on all three metrics at every
+checkpoint. The advantage is largest at iteration 1{,}000 ($\Delta\text{PSNR} =
++0.391\,\text{dB}$, $\Delta\text{SSIM} = +0.022$, $\Delta\text{LPIPS} = -0.028$)
+and narrows monotonically through iteration 7{,}000 ($\Delta\text{PSNR} =
++0.165\,\text{dB}$). This convergence-speed pattern is consistent with the
+hypothesis that denser initialization provides an early-training head start that
+ADC gradually compensates for.
+
+\subsection{Per-View Robustness Analysis}
+\label{sec:perviewstats}
+
+To assess whether the aggregate improvement held consistently across test views,
+per-pixel $\ell_1$ error was computed individually for each of the $n=32$ test
+views at iteration 7{,}000. Let $e_i^\text{base}$ and $e_i^\text{dense}$ denote
+the mean $\ell_1$ error for view $i$; define $\delta_i = e_i^\text{dense} -
+e_i^\text{base}$ (negative = densified better).
+
+\begin{table}[h]
+\centering
+\caption{Per-view $\ell_1$ error analysis at iteration 7{,}000.}
+\label{tab:perviewstats}
+\begin{tabular}{lc}
+\toprule
+\textbf{Statistic} & \textbf{Value} \\
+\midrule
+Views where densified is better ($\delta_i < 0$) & $17/32$ ($53.1\%$) \\
+Views where baseline is better ($\delta_i > 0$) & $15/32$ ($46.9\%$) \\
+Mean delta $\bar{\delta}$ & $-0.037$ \\
+Standard deviation $\sigma_\delta$ & $0.326$ \\
+Best case (view 00014) & $\delta = -0.82$ \\
+Worst case (view 00003) & $\delta = +0.68$ \\
+\midrule
+Paired $t$-test: $t$-statistic & $-0.634$ \\
+Paired $t$-test: $p$-value & $0.531$ \\
+Wilcoxon signed-rank: $p$-value & $0.488$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both the paired $t$-test ($p = 0.531$) and the Wilcoxon signed-rank test
+($p = 0.488$) fail to reject the null hypothesis ($\alpha = 0.05$). The aggregate
+metric improvement, while consistent and reproducible, is not statistically
+significant at the per-view level given $n = 32$ views and a single scene/seed.
+
+\subsection{Compactness Analysis}
+\label{sec:compactness}
+
+Table~\ref{tab:compactness} reports the final Gaussian count for both conditions
+at iteration 7{,}000.
+
+\begin{table}[h]
+\centering
+\caption{Final Gaussian counts at iteration 7{,}000.}
+\label{tab:compactness}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Condition} & \textbf{Init points} & \textbf{Final Gaussians}
+                   & \textbf{ADC added} & \textbf{Increase} \\
+\midrule
+Baseline  & 136{,}029 & 1{,}681{,}300 & $+1{,}545{,}271$ & $12.4\times$ \\
+Densified & 197{,}869 & 1{,}733{,}031 & $+1{,}535{,}162$ & $\phantom{1}8.8\times$ \\
+\midrule
+$\Delta$ & $+45.5\%$ & $+3.1\%$ & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Despite a 45.5\% larger initialization, the densified model contains only 3.1\%
+more Gaussians at convergence. ADC added approximately $1.54\times10^6$ Gaussians
+in both conditions, suggesting its growth criteria respond to per-view residual
+error rather than global point density. The proposed method therefore confers
+\textbf{no compactness benefit}.
+
+\subsection{Summary}
+\label{sec:summary}
+
+\begin{tcolorbox}[notebox]
+Denser initialization produces a small, consistent improvement in aggregate
+reconstruction quality during early training ($\Delta\text{PSNR} = +0.39\,\text{dB}$
+at iter.\ 1{,}000). This effect is not statistically significant at the per-view
+level ($p \approx 0.49$, $n = 32$) and does not reduce the final Gaussian count.
+The contribution is best characterized as a modest, directional early-convergence
+benefit rather than a definitive quality improvement.
+\end{tcolorbox}
+
+% ============================================================
+\section{Limitations}
+
+\begin{itemize}
+    \item \textbf{Single scene:} Evaluation is limited to the Tanks and Temples
+    \textit{truck} scene. Generalization to other scene types is unknown.
+
+    \item \textbf{Single seed:} All runs use a fixed random seed. Results may
+    vary across seeds; the per-view analysis ($p \approx 0.49$) is inconclusive
+    with $n = 32$.
+
+    \item \textbf{Reduced iterations:} Training was capped at 7{,}000 iterations
+    due to Google Colab free-tier session limits. The reference paper uses 30{,}000
+    iterations. The baseline's 30{,}000-iteration result is provided in
+    Table~\ref{tab:results} for reference only.
+
+    \item \textbf{No hyperparameter sweep:} Only one setting of $(\tau, k, m_\text{max})$
+    was evaluated due to compute constraints.
+
+    \item \textbf{No surface geometry:} The midpoint interpolation in
+    Eq.~\eqref{eq:midpoint} does not account for surface orientation or local
+    geometry, which may lead to off-surface insertions in curved regions.
+\end{itemize}
+
+% ============================================================
+\section{Conclusion}
+
+This thesis proposed and evaluated neighbor-interpolated point cloud densification
+as a preprocessing strategy for improving 3D Gaussian Splatting initialization.
+The core contribution is a simple geometric algorithm (Algorithm~\ref{alg:densify})
+that identifies and fills gaps in sparse SfM point clouds using $k$-NN midpoint
+interpolation, requiring no changes to the 3DGS training pipeline.
+
+Experiments on the Tanks and Temples \textit{truck} scene demonstrated a consistent
+aggregate improvement across PSNR, SSIM, and LPIPS at every evaluated checkpoint
+(Table~\ref{tab:results}), with the largest advantage early in training
+($\Delta\text{PSNR} = +0.391\,\text{dB}$ at iteration 1{,}000) diminishing toward
+convergence. Two important null findings were also reported: (1) the improvement is
+not statistically significant at the per-view level (Wilcoxon $p = 0.488$,
+Table~\ref{tab:perviewstats}); and (2) the method provides no compactness benefit,
+as Adaptive Density Control operates independently of initialization density
+(Table~\ref{tab:compactness}).
+
+These findings position the method as a lightweight, zero-cost-at-training-time
+initialization improvement with a modest, directional benefit --- a complete,
+honest, reproducible MSc-level experiment with clear directions for future work.
+
+\subsection*{Future Work}
+
+\begin{itemize}
+    \item Multi-scene validation across the full Tanks and Temples and Deep
+    Blending benchmarks to assess generalization.
+
+    \item Hyperparameter sweep over $\tau \in \{2, 3, 4, 5\}$ and
+    $k \in \{4, 6, 8\}$ to characterize the quality/compactness trade-off.
+
+    \item Full 30{,}000-iteration runs to determine whether the early-training
+    advantage persists at convergence.
+
+    \item Surface-aware insertions using local normal estimation to improve
+    geometric accuracy of synthetic points.
+
+    \item Extension toward an IEEE Access submission with multi-scene,
+    multi-seed statistical validation.
+\end{itemize}
+
+% ============================================================
+\bibliographystyle{plainnat}
+\begin{thebibliography}{99}
+
+\bibitem[Barron et al.(2022)]{barron2022mipnerf360}
+Barron, J.~T., Mildenhall, B., Verbin, D., Srinivasan, P.~P., and Hedman, P.
+\newblock Mip-{NeRF} 360: Unbounded anti-aliased neural radiance fields.
+\newblock In \emph{CVPR}, 2022.
+
+\bibitem[Fan et al.(2024)]{fan2024lightgaussian}
+Fan, Z. et al.
+\newblock {LightGaussian}: Unbounded 3{D} {Gaussian} compression with 15x
+reduction and 200+ {FPS}.
+\newblock In \emph{NeurIPS}, 2024.
+
+\bibitem[Foroutan et al.(2024)]{foroutan2024sfm}
+Foroutan, Y., Rebain, D., Yi, K.~M., and Tagliasacchi, A.
+\newblock Evaluating alternatives to {SfM} point cloud initialization for
+{Gaussian} splatting.
+\newblock \emph{arXiv:2404.12547}, 2024.
+
+\bibitem[Jung et al.(2024)]{jung2024rain}
+Jung, J., Han, J., An, H., Kang, J., Park, S., and Kim, S.
+\newblock Relaxing accurate initialization constraint for {3D} {Gaussian}
+splatting.
+\newblock \emph{arXiv:2403.09413}, 2024.
+
+\bibitem[Kerbl et al.(2023)]{kerbl20233dgs}
+Kerbl, B., Kopanas, G., Leimk\"{u}hler, T., and Drettakis, G.
+\newblock {3D Gaussian} splatting for real-time radiance field rendering.
+\newblock \emph{ACM Transactions on Graphics}, 42(4), 2023.
+
+\bibitem[Knapitsch et al.(2017)]{knapitsch2017tanks}
+Knapitsch, A., Park, J., Zhou, Q.-Y., and Koltun, V.
+\newblock Tanks and temples: Benchmarking large-scale scene reconstruction.
+\newblock \emph{ACM Transactions on Graphics}, 36(4), 2017.
+
+\bibitem[Lu et al.(2024)]{lu2024scaffold}
+Lu, T., Yu, M., Xu, L., Xiangli, Y., Wang, L., Lin, D., and Dai, B.
+\newblock {Scaffold-GS}: Structured 3{D} {Gaussians} for view-adaptive
+rendering.
+\newblock In \emph{CVPR}, 2024.
+
+\bibitem[Mildenhall et al.(2020)]{mildenhall2020nerf}
+Mildenhall, B., Srinivasan, P.~P., Tancik, M., Barron, J.~T., Ramamoorthi, R.,
+and Ng, R.
+\newblock {NeRF}: Representing scenes as neural radiance fields for view
+synthesis.
+\newblock In \emph{ECCV}, 2020.
+
+\bibitem[M\"{u}ller et al.(2022)]{muller2022instant}
+M\"{u}ller, T., Evans, A., Schied, C., and Keller, A.
+\newblock Instant neural graphics primitives with a multiresolution hash
+encoding.
+\newblock \emph{ACM Transactions on Graphics}, 41(4), 2022.
+
+\bibitem[Navaneet et al.(2023)]{navaneet2023compact3d}
+Navaneet, K.~L., Meibodi, K.~P., Koohpayegani, S.~A., and Pirsiavash, H.
+\newblock {Compact3D}: Compressing {Gaussian} splat radiance field models with
+vector quantization.
+\newblock \emph{arXiv:2311.18159}, 2023.
+
+\bibitem[Pumarola et al.(2021)]{pumarola2021dnerf}
+Pumarola, A., Corona, E., Pons-Moll, G., and Moreno-Noguer, F.
+\newblock {D-NeRF}: Neural radiance fields for dynamic scenes.
+\newblock In \emph{CVPR}, 2021.
+
+\bibitem[Sch\"{o}nberger and Frahm(2016)]{schonberger2016sfm}
+Sch\"{o}nberger, J.~L. and Frahm, J.-M.
+\newblock Structure-from-motion revisited.
+\newblock In \emph{CVPR}, 2016.
+
+\end{thebibliography}
+
+\end{document}
