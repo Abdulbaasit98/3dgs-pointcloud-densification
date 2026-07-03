@@ -1,7 +1,7 @@
 # Neighbor-Interpolated Point Cloud Densification for 3D Gaussian Splatting
 
 > **Thesis project** — ABDUGANIEV ABDULVOSIT, Seoul National University of Science and Technology, 2026  
-> Supervisor: [Supervisor Name]
+> Supervisor: Dong Ho Kim
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
